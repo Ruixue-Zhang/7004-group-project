@@ -53,9 +53,13 @@ To manage and avoid the credit risk of users.
   
 ## 1.2 Project Question
 
-* 
+* predict credit amount (regression)
 
-* 
+* what variables most related to the credit amount? (classification)
+
+* What level of risk does the customer belong to？
+
+* What is the credit limit of the customer？
 
 # 2 Data Pre-processing
 
@@ -80,7 +84,7 @@ library(tidyverse)
 
 ```
 
-### Read in dataset
+### Read data
 
 ```{r,message=FALSE}
 df=read.csv('german_credit_data.csv')
@@ -167,14 +171,14 @@ df.nomis[!complete.cases(df.nomis),] <- df.imp$ximp
 
 ```
 
-**SavAcct values distribution after imputation:**
+**Saving.Account values distribution after imputation:**
 
 ```{r}
 table(df.nomis$Saving.accounts)
 
 ```
 
-**CheckAcct values distribution after imputation:**
+**Checking.Account values distribution after imputation:**
 
 ```{r}
 table(df.nomis$Checking.account)
@@ -215,9 +219,9 @@ summary(df.nomis)
 * Sex: (dichotomous: female, male)
 * Job: (ordinal: 0 - unskilled and non-resident, 1 - unskilled and resident, 2 - skilled, 3 - highly skilled)
 * Housing: (nominal: own, rent, or free)
-* SavAcct: (ordinal: little, moderate, quite rich, rich) - Status of existing saving account.
-* CheckAcct: (ordinal: little, moderate, rich) - Status of existing checking account.
-* CredAmt: (quantitative, in D-mark) The maximum amount that the bank is committed to lend.
-* Duration: (quantitative, in month)
+* Saving.accounts: (ordinal: little, moderate, quite rich, rich) - Status of existing saving account.
+* Checking.account: (ordinal: little, moderate, rich) - Status of existing checking account.
+* Credit.amount: (quantitative, in D-mark) The maximum amount that the bank is committed to lend.
+* Duration: (quantitative, in month) The specified time to pay the credit.
 * Purpose: (nominal: car, furniture/equipment, radio/TV, domestic appliances, repairs, education, business, vacation/others) - Reasons to get a loan.
 * Risk: (dichotomous : good, bad)
