@@ -225,3 +225,92 @@ summary(df.nomis)
 * Duration: (quantitative, in month) The specified time to pay the credit.
 * Purpose: (nominal: car, furniture/equipment, radio/TV, domestic appliances, repairs, education, business, vacation/others) - Reasons to get a loan.
 * Risk: (dichotomous : good, bad)
+
+
+# 3 Exploratory Data Analysis
+
+## 3.1  show the relationship between the duration of credit and the credit amount
+
+```{r}
+Dur_Cred_Plot<-ggplot(df.nomis, aes(x=Duration, y=Credit.amount))+geom_point()
+Dur_Cred_Plot
+
+```
+
+## 3.2 show the relationship between the sex and the credit amount
+
+```{r}
+Sex_Cred_Plot<-ggplot(df.nomis,aes(x=Sex, y=Credit.amount))+geom_jitter(size=2, alpha=0.5)
+Sex_Cred_Plot
+
+```
+
+## 3.3 analyse the relationship between duration of credit and age
+
+```{r}
+Dur_Age_Plot<-ggplot(df.nomis,aes(x=Duration, y=Age, color=Risk))+geom_point()+geom_smooth()
+Dur_Age_Plot
+
+```
+
+## 3.4 display points in scatter plot for bad and good loans
+
+```{r}
+Dur_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Duration,y=Credit.amount))+geom_point(aes(color=Risk))
+Dur_Cred_Risk_Plot
+
+```
+
+## 3.5 use faceting to split entire graph into 2 separate panels for each, good and bads loans
+
+```{r}
+Dur_Cred_Risk_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth(se=F)+
+  facet_grid(.~Risk)
+Dur_Cred_Risk_facetPlot
+
+```
+
+## 3.6 check how the Job variable impacts the credit
+
+```{r}
+Dur_Cred_Risk_Job_Plot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Job))+geom_point()+geom_smooth(se=F, method="lm")+
+  facet_grid(.~Risk)
+Dur_Cred_Risk_Job_Plot
+
+```
+
+## 3.7 facet to split the graph into the 4 type job variables
+
+```{r}
+Dur_Cred_Risk_Job_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Risk))+geom_point()+geom_smooth(se=F, method="lm")+
+  facet_grid(.~Job)
+Dur_Cred_Risk_Job_facetPlot
+
+```
+
+## 3.8 show relationship between the savings account and credit amount
+
+```{r}
+Sav_Cred_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount))+geom_bar(stat="identity")
+Sav_Cred_Plot
+
+```
+
+## 3.9 show the good and bad loans in each savings account category
+
+```{r}
+Sav_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount, fill=Risk))+geom_bar(stat="identity", position=position_dodge())
+Sav_Cred_Risk_Plot
+
+```
+
+## 3.10 analyse the good and bad loans in the relationship between duration of credit and credit amount using the housing variable
+
+```{r}
+Dur_Cred_House_Risk<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth()+
+  facet_grid(Housing~Risk)
+Dur_Cred_House_Risk
+
+```
+
+
