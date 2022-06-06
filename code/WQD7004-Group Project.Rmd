@@ -1,18 +1,24 @@
 ---
-title: "**WQD7004 - Group 10 Project - Credit Risk Prediction**"
-date: | 
-output: 
-  pdf_document:
-    latex_engine: xelatex
-header-includes:
-   - \usepackage{setspace}
-   - \doublespacing
-geometry: margin=1in
-fontsize: 12pt
-mainfont: Calibri
-sansfont: Calibri
-monofont: Calibri
-spacing: double
+title: "WQD7004_GroupProject"
+author: "
+- HUIJUN LIU (S2142285)
+
+- RUIXUE ZHANG (S2142119)
+
+- KELVIIN RAJJ KARUPAYA (S2151665)
+
+- LINGYU MENG (S2131391)
+
+- ZUOGE CHEN (S2125783)
+
+"
+output:
+ rmdformats::readthedown:
+ self_contained: true
+ thumbnails: true
+ lightbox: true
+ gallery: false
+ highlight: tango
 ---
 
 ```{r setup, include=FALSE}
@@ -81,14 +87,19 @@ library(nnet)
 library(Metrics)
 library(rpart)
 library(tidyverse)
-
+library(skimr)
+library(caret)
+library(pROC)
+library(DataExplorer)
 ```
+
 
 ### Read data
 
 ```{r,message=FALSE}
-df=read.csv('german_credit_data.csv')
-# Delete the 1st column which is used for indexing.
+
+df = read.csv('file.choose()') 
+#Delete the 1st column which is used for indexing.
 df=df[,-1]
 head(df)
 
@@ -149,6 +160,7 @@ df1$Purpose <- as.factor(df1$Purpose)
 df1$Risk <- as.ordered(df1$Risk)
 
 ```
+
 
 **Step 2: Impute NAs using missForest**
 
@@ -303,14 +315,93 @@ Sav_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount, fill
 Sav_Cred_Risk_Plot
 
 ```
-
 ## 3.10 analyse the good and bad loans in the relationship between duration of credit and credit amount using the housing variable
 
 ```{r}
 Dur_Cred_House_Risk<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth()+
   facet_grid(Housing~Risk)
+```
+
+
+```{r}
 Dur_Cred_House_Risk
+```
+
+
+# 4 Modeling
+## 4.1 Regression Model  predict credit amount (regression)
+```{r}
+df2 = read.csv(file.choose()) 
 
 ```
+
+```{r}
+skim(df.nomis)
+```
+```{r}
+# Check the missing data
+plot_missing(df.nomis)
+```
+```{r}
+class(df2)
+```
+```{r}
+head(df.nomis)
+```
+
+
+```{r}
+# feature engineering
+# Train/Test split for Regression
+train1 <-createDataPartition(y=df.nomis$Credit.amount,p=0.7,list=FALSE)
+
+train <- df2[train1, ]
+
+test <- df2[-train1, ]
+
+# fold cross validation
+train_control <- trainControl(method="cv", number=10)
+```
+### simple linear regression model
+```{r}
+fit <- lm(Credit.amount ~ Age,data = df.nomis)
+summary(fit)
+```
+
+```{r}
+plot(df.nomis$Age,df.nomis$Credit.amount)
+abline(fit) 
+```
+
+### multiple linear regression model
+```{r}
+fit2 <- lm(Credit.amount ~ Age+Sex+Job+Housing+Saving.accounts+Checking.account,data = df.nomis)
+summary(fit2)
+```
+```{r}
+anova(fit,fit2)
+```
+```{r}
+# ridge regression
+set.seed(42)
+model_ridge <- train(Credit.amount~ Age+Sex+Job+Housing+Saving.accounts+Checking.account,data= train, trControl=train_control,method="ridge", metric="RMSE")
+model_ridge
+```
+```{r}
+set.seed(42)
+model_lars <- train(Credit.amount~ Age+Sex+Job+Housing+Saving.accounts+Checking.account,data= train, trControl=train_control,method="lars", metric="RMSE")
+model_lars
+```
+Evidently, least angle regression has the smaller RMSE and we will choose it as our prediction model. Similarly, we will confirm whether our model is overfitting.
+```{r}
+# Make predictions on the testing dataset
+x_test_reg <- df.nomis[,1:6 ]
+y_test_reg <- df.nomis[, 7]
+prediction_lars <- predict(model_lars,x_test_reg)
+RMSE(prediction_lars, y_test_reg)
+```
+Conclusion:
+We could see both RMSE are about 2570.894 and perform almost the same with the model trained on all features. Thus we could predict the Credit.amount with this model especially considering a vast amount of data.
+
 
 

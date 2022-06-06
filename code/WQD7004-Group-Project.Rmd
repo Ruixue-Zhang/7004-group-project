@@ -1,0 +1,404 @@
+---
+title: "WQD7004_GroupProject"
+author: "
+- HUIJUN LIU (S2142285)
+
+- RUIXUE ZHANG (S2142119)
+
+- KELVIIN RAJJ KARUPAYA (S2151665)
+
+- LINGYU MENG (S2131391)
+
+- ZUOGE CHEN (S2125783)
+"
+output:
+ rmdformats::readthedown:
+ self_contained: true
+ thumbnails: true
+ lightbox: true
+ gallery: false
+ highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Group No.: 10
+## Group Members
+
+* LINGYU MENG (S2131391)
+
+* HUIJUN LIU (S2142285)
+
+* ZUOGE CHEN (S2125783)
+
+* KELVIIN RAJJ KARUPAYA (S2151665)
+
+* RUIXUE ZHANG (S2142119)
+
+## Dataset
+
+
+* Title: German Credit Risk
+
+* Year: 2020
+
+* Content: This dataset classifies people described by a set of attributes as good or bad credit risks.
+
+* Source: https://www.kaggle.com/datasets/kabure/german-credit-data-with-risk
+
+
+# 1 Introduction
+
+In this dataset, each entry represents a person who takes a credit by a bank. Each person is classified as good or bad credit risks according to the set of attributes.
+ 
+## 1.1 Project Objective
+
+To manage and avoid the credit risk of users.
+  
+## 1.2 Project Question
+
+* predict credit amount (regression)
+
+* what variables most related to the credit amount? (classification)
+
+* What level of risk does the customer belong to？
+
+* What is the credit limit of the customer？
+
+# 2 Data Pre-processing
+
+## 2.1 Data Understanding
+
+### Import libraries
+
+```{r import libraries, message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(VIM)
+library(missForest)
+library(Hmisc)
+library(caret)
+library(ggplot2)
+library(e1071)
+library(klaR)
+library(nnet)
+library(Metrics)
+library(rpart)
+library(tidyverse)
+library(skimr)
+library(caret)
+library(pROC)
+library(DataExplorer)
+```
+
+
+### Read data
+
+```{r,message=FALSE}
+
+df = read.csv(file.choose()) 
+#Delete the 1st column which is used for indexing.
+df=df[,-1]
+head(df)
+
+```
+
+### See the structure of dataset
+
+```{r str}
+str(df)
+
+```
+
+## 2.2 Handle missing data
+
+### Check missing values
+
+```{r check NAs}
+print(paste('Complete obs.:',sum(complete.cases(df))))
+
+```
+
+* Distribution of NAs (by column):
+
+```{r}
+colSums(is.na(df))
+
+```
+
+* Check if any missing value is "" type
+
+```{r}
+colSums(df=="")
+
+```
+
+### Visualisation of missing part
+
+```{r VIM}
+aggr(df,labels=names(df),col=c('blue','red'),
+     numbrs=T,sortVars=T)
+
+```
+
+As shown above, Saving.accounts & Check.account contain missing values, and red color presents missing part.
+
+### Predict and impute NAs
+
+**Step 1: Convert chr variables to factor type**
+
+```{r convert type}
+df1 <- df
+df1$Sex <- as.factor(df1$Sex)
+df1$Job <- as.ordered(df1$Job)
+df1$Housing <- as.factor(df1$Housing)
+df1$Saving.accounts <- as.ordered(df1$Saving.accounts)
+df1$Checking.account <- as.ordered(df1$Checking.account)
+df1$Purpose <- as.factor(df1$Purpose)
+df1$Risk <- as.ordered(df1$Risk)
+
+```
+
+
+**Step 2: Impute NAs using missForest**
+
+**missForest** is used to impute missing values particularly in the case of mixed-type data. It can be used to impute **continuous and/or categorical** data including complex interactions and nonlinear relations. It yields an out-of-bag (OOB) imputation error estimate. Moreover, it can be run parallel to save computation time.  
+  
+```{r missForest}
+df.mis <- df1[!complete.cases(df1),]
+df.train <- df1[complete.cases(df1),]
+set.seed(42)
+df.imp <- missForest(xmis = df.mis, xtrue = df.train, maxiter = 10, ntree = 200)
+message('Out of Bag error: ', df.imp$OOBerror)
+
+```
+
+**Save imputation result**
+
+```{r impute}
+df.nomis <- df1
+df.nomis[!complete.cases(df.nomis),] <- df.imp$ximp
+
+```
+
+**Saving.Account values distribution after imputation:**
+
+```{r}
+table(df.nomis$Saving.accounts)
+
+```
+
+**Checking.Account values distribution after imputation:**
+
+```{r}
+table(df.nomis$Checking.account)
+
+```
+
+## 2.3 Smooth noisy data (Not yet decided)
+
+```{r eval=FALSE, include=FALSE}
+Age_bp <- boxplot(df.nomis$Age,boxwex=0.7)
+Age_bp$out
+CredAmt_bp <- boxplot(df.nomis$Credit.amount, boxwex=0.7)
+CredAmt_bp$out
+Duration_bp <- boxplot(df.nomis$Duration,boxwex=0.7)
+Duration_bp$out
+```
+
+
+* Save cleaned dataset
+
+```{r save dataset}
+write.csv(df.nomis,file = 'german_credit_data_rmna.csv',row.names=F)
+
+```
+
+* Summary dataset
+
+```{r summary}
+summary(df.nomis)
+
+```
+
+
+
+### Descriptions of cleaned dataset
+
+* Age: (quantitative, in years)
+* Sex: (dichotomous: female, male)
+* Job: (ordinal: 0 - unskilled and non-resident, 1 - unskilled and resident, 2 - skilled, 3 - highly skilled)
+* Housing: (nominal: own, rent, or free)
+* Saving.accounts: (ordinal: little, moderate, quite rich, rich) - Status of existing saving account.
+* Checking.account: (ordinal: little, moderate, rich) - Status of existing checking account.
+* Credit.amount: (quantitative, in D-mark) The maximum amount that the bank is committed to lend.
+* Duration: (quantitative, in month) The specified time to pay the credit.
+* Purpose: (nominal: car, furniture/equipment, radio/TV, domestic appliances, repairs, education, business, vacation/others) - Reasons to get a loan.
+* Risk: (dichotomous : good, bad)
+
+
+# 3 Exploratory Data Analysis
+
+## 3.1  show the relationship between the duration of credit and the credit amount
+
+```{r}
+Dur_Cred_Plot<-ggplot(df.nomis, aes(x=Duration, y=Credit.amount))+geom_point()
+Dur_Cred_Plot
+
+```
+
+## 3.2 show the relationship between the sex and the credit amount
+
+```{r}
+Sex_Cred_Plot<-ggplot(df.nomis,aes(x=Sex, y=Credit.amount))+geom_jitter(size=2, alpha=0.5)
+Sex_Cred_Plot
+
+```
+
+## 3.3 analyse the relationship between duration of credit and age
+
+```{r}
+Dur_Age_Plot<-ggplot(df.nomis,aes(x=Duration, y=Age, color=Risk))+geom_point()+geom_smooth()
+Dur_Age_Plot
+
+```
+
+## 3.4 display points in scatter plot for bad and good loans
+
+```{r}
+Dur_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Duration,y=Credit.amount))+geom_point(aes(color=Risk))
+Dur_Cred_Risk_Plot
+
+```
+
+## 3.5 use faceting to split entire graph into 2 separate panels for each, good and bads loans
+
+```{r}
+Dur_Cred_Risk_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth(se=F)+
+  facet_grid(.~Risk)
+Dur_Cred_Risk_facetPlot
+
+```
+
+## 3.6 check how the Job variable impacts the credit
+
+```{r}
+Dur_Cred_Risk_Job_Plot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Job))+geom_point()+geom_smooth(se=F, method="lm")+
+  facet_grid(.~Risk)
+Dur_Cred_Risk_Job_Plot
+
+```
+
+## 3.7 facet to split the graph into the 4 type job variables
+
+```{r}
+Dur_Cred_Risk_Job_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Risk))+geom_point()+geom_smooth(se=F, method="lm")+
+  facet_grid(.~Job)
+Dur_Cred_Risk_Job_facetPlot
+
+```
+
+## 3.8 show relationship between the savings account and credit amount
+
+```{r}
+Sav_Cred_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount))+geom_bar(stat="identity")
+Sav_Cred_Plot
+
+```
+
+## 3.9 show the good and bad loans in each savings account category
+
+```{r}
+Sav_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount, fill=Risk))+geom_bar(stat="identity", position=position_dodge())
+Sav_Cred_Risk_Plot
+
+```
+## 3.10 analyse the good and bad loans in the relationship between duration of credit and credit amount using the housing variable
+
+```{r}
+Dur_Cred_House_Risk<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth()+
+  facet_grid(Housing~Risk)
+```
+
+
+```{r}
+Dur_Cred_House_Risk
+```
+
+
+# 4 Modeling
+## 4.1 Regression Model  predict credit amount (regression)
+```{r}
+skim(df.nomis)
+```
+```{r}
+# Check the missing data
+plot_missing(df.nomis)
+```
+```{r}
+class(df.nomis)
+```
+```{r}
+head(df.nomis)
+```
+
+
+```{r}
+# feature engineering
+# Train/Test split for Regression
+set.seed(42)
+train1 <-createDataPartition(y=df.nomis$Credit.amount,p=0.7,list=FALSE)
+
+train <- df.nomis[train1, ]
+
+test <- df.nomis[-train1, ]
+# fold cross validation
+```
+
+
+```{r}
+train_control <- trainControl(method="cv", number=10)
+```
+### 4.1.1 simple linear regression model
+```{r}
+fit <- lm(Credit.amount ~ Age,data = df.nomis)
+summary(fit)
+```
+
+```{r}
+plot(df.nomis$Age,df.nomis$Credit.amount)
+abline(fit) 
+```
+
+### 4.1.2 multiple linear regression model
+```{r}
+fit2 <- lm(Credit.amount ~ Age+Sex+Job+Housing+Saving.accounts+Checking.account,data = df.nomis)
+summary(fit2)
+```
+```{r}
+anova(fit,fit2)
+```
+```{r}
+# ridge regression
+set.seed(42)
+model_ridge <- train(Credit.amount~ Age+Sex+Job+Housing+Saving.accounts+Checking.account,data= train, trControl=train_control,method="ridge", metric="RMSE")
+model_ridge
+```
+```{r}
+set.seed(42)
+model_lars <- train(Credit.amount~ Age+Sex+Job+Housing+Saving.accounts+Checking.account,data= train, trControl=train_control,method="lars", metric="RMSE")
+model_lars
+```
+Evidently, least angle regression has the smaller RMSE and we will choose it as our prediction model. Similarly, we will confirm whether our model is overfitting.
+```{r}
+# Make predictions on the testing dataset
+x_test_reg <- df.nomis[,1:6 ]
+y_test_reg <- df.nomis[, 7]
+prediction_lars <- predict(model_lars,x_test_reg)
+RMSE(prediction_lars, y_test_reg)
+```
+Conclusion:
+We could see both RMSE are about 2570.894 and perform almost the same with the model trained on all features. Thus we could predict the Credit.amount with this model especially considering a vast amount of data.
+
+
