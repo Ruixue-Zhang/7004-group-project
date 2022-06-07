@@ -85,6 +85,7 @@ library(klaR)
 library(nnet)
 library(Metrics)
 library(rpart)
+library(rpart.plot)
 library(tidyverse)
 library(skimr)
 library(caret)
@@ -348,16 +349,26 @@ head(df.nomis)
 # feature engineering
 # Train/Test split for Regression
 set.seed(42)
-train1 <-createDataPartition(y=df.nomis$Credit.amount,p=0.7,list=FALSE)
+train1 <-createDataPartition(y=df.nomis$Credit.amount,p=0.5,list=FALSE)
 
 train <- df.nomis[train1, ]
 
 test <- df.nomis[-train1, ]
-# fold cross validation
+
+```
+```{r}
+hist(df.nomis$Credit.amount,breaks=50)
+```
+```{r}
+# Split dependent variable distribution
+hist(train$Credit.amount,breaks=50)
+hist(test$Credit.amount,breaks=50)
+
 ```
 
 
 ```{r}
+# fold cross validation
 train_control <- trainControl(method="cv", number=10)
 ```
 ### 4.1.1 simple linear regression model
@@ -398,7 +409,120 @@ y_test_reg <- df.nomis[, 7]
 prediction_lars <- predict(model_lars,x_test_reg)
 RMSE(prediction_lars, y_test_reg)
 ```
+```{r}
+# decision tree
+colnames(df.nomis)
+form_reg <- as.formula(
+  paste0('Credit.amount~',
+         paste(colnames(train)[1:6],collapse="+")
+    
+  )
+)
+form_reg
+```
+```{r}
+# training model
+set.seed(42)
+fit_dt_reg <- rpart(
+  form_reg,#formula
+  data = train,
+  method = "anova",# regression
+  control = rpart.control(cp = 0.005)
+)
+```
+```{r}
+# Original regression tree
+fit_dt_reg
+```
+```{r}
+# Complexity correlation
+printcp(fit_dt_reg)
+plotcp(fit_dt_reg)
+
+```
+```{r}
+# After the cut branches
+fit_dt_reg_pruned <- prune(fit_dt_reg,cp =0.024)
+print(fit_dt_reg_pruned)
+```
+```{r}
+# Variable importance value
+fit_dt_reg_pruned$variable.importance
+fit_dt_reg$variable.importance
+
+```
+```{r}
+# Variable importance diagram
+varimpdata <- 
+  data.frame(importance=fit_dt_reg_pruned$variable.importance)
+ggplot(varimpdata,
+       aes(x = as_factor(rownames(varimpdata)),y=importance))+
+  geom_col()+
+  labs(x = 'variables')+
+  theme_classic()
+```
+```{r}
+# tree diagram
+prp(fit_dt_reg_pruned,
+    type=1,
+    extra = 101,
+    fallen.leaves =TRUE,
+    main="Decision Tree")
+
+```
+```{r}
+# predicted
+# The training set predicts the results
+trainpred <- predict(fit_dt_reg_pruned,newdata=train)
+```
+```{r}
+# Training set prediction error index
+defaultSummary(data.frame(obs = train$Credit.amount,pred=trainpred))
+```
+```{r}
+# Graph the training set predicted results
+plot(x=train$Credit.amount,
+     y=trainpred,
+     xlab="Actual",
+     ylab="Prediction",
+     main='Comparison of actual and predicted values',
+     sub= 'training set')
+trainlinmod <- lm(trainpred~train$Credit.amount)
+abline(trainlinmod,col="blue",lwd = 2.5,lty='solid')
+abline(a=0,b=1,col='red',lwd=2.5,lty='dashed')
+legend("topleft",
+       legend = c("Model","Base"),
+       col  = c("blue","red"),
+       lwd = 2.5,
+       lty = c("solid","dashed"))
+```
+```{r}
+# Test sets predict results
+testpred <- predict(fit_dt_reg_pruned,newdata = test)
+```
+```{r}
+# Test set prediction error index
+defaultSummary(data.frame(obs= test$Credit.amount,pred=testpred))
+```
+```{r}
+# Graph the test set predicted results
+plot(x=test$Credit.amount,
+     y=testpred,
+     xlab="Actual",
+     ylab="Prediction",
+     main='Comparison of actual and predicted values',
+     sub= 'test set')
+testlinmod <- lm(testpred~test$Credit.amount)
+abline(testlinmod,col="blue",lwd = 2.5,lty='solid')
+abline(a=0,b=1,col='red',lwd=2.5,lty='dashed')
+legend("topleft",
+       legend = c("Model","Base"),
+       col  = c("blue","red"),
+       lwd = 2.5,
+       lty = c("solid","dashed"))
+```
+
 Conclusion:
-We could see both RMSE are about 2570.894 and perform almost the same with the model trained on all features. Thus we could predict the Credit.amount with this model especially considering a vast amount of data.
+Job,Checking.account and Saving.accounts have a great influence on the target value.We could see both RMSE are about 2570.894 and perform almost the same with the model trained on all features. Thus we could predict the Credit.amount with liner regression model especially considering a vast amount of data.
 
 
