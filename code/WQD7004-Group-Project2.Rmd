@@ -407,12 +407,10 @@ Sav_Cred_Risk_Plot
 ```{r}
 Dur_Cred_House_Risk<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth()+
   facet_grid(Housing~Risk)
-```
-
-
-```{r}
 Dur_Cred_House_Risk
+
 ```
+
 
 
 # 4 Modeling
