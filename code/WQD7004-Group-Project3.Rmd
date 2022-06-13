@@ -1,0 +1,676 @@
+---
+title: "WQD7004_GroupProject"
+author: "
+- HUIJUN LIU (S2142285)
+
+- RUIXUE ZHANG (S2142119)
+
+- KELVIIN RAJJ KARUPAYA (S2151665)
+
+- LINGYU MENG (S2131391)
+
+- ZUOGE CHEN (S2125783)
+"
+output:
+ rmdformats::readthedown:
+ self_contained: true
+ thumbnails: true
+ lightbox: true
+ gallery: false
+ highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Group No.: 10
+
+## Group Members
+
+-   LINGYU MENG (S2131391)
+
+-   HUIJUN LIU (S2142285)
+
+-   ZUOGE CHEN (S2125783)
+
+-   KELVIIN RAJJ KARUPAYA (S2151665)
+
+-   RUIXUE ZHANG (S2142119)
+
+## Dataset
+
+-   Title: German Credit Risk
+
+-   Year: 2020
+
+-   Content: This dataset classifies people described by a set of attributes as good or bad credit risks.
+
+-   Source: <https://www.kaggle.com/datasets/kabure/german-credit-data-with-risk>
+
+------------------------------------------------------------------------
+
+-   Title: Sanction Loan
+
+-   Year: 2021
+
+-   Content: This dataset contains features related to predict the loan amount.
+
+-   Source: <https://www.kaggle.com/datasets/zyper26/sanction-loan>
+
+# 1 Introduction
+
+With rising property rates, most people avail home loans to buy their dream houses. Once you have finalized your budget and the house that you want to buy, you must ensure that you have sufficient funds to pay the seller.
+
+Loans are the core business of banks. The main profit comes directly from the loan's interest. The loan companies grant a loan after an intensive process of verification and validation. However, they still don't have assurance if the applicant is able to repay the loan with no difficulties.The bank only lends up to 80% of the total amount based on a person's finances (salary, outgoing expenses, existing loans, etc.). You will need to make the rest of the payment yourself after the bank tells you how much they can lend.
+
+In the German Credit Risk dataset, each entry represents a person who takes a credit by a bank. Each person is classified as good or bad credit risks according to the set of attributes. In the Sanction Loan dataset, we need predict the credit risk level of applicants and the loan amount that can be sanctioned to customers who have applied for a home loan using the features provided.
+
+## 1.1 Project Objective
+
+-   To know the relationship between applicants demographics and the credit amount.
+
+-   To predict the credit risk level of applicants.
+
+-   To predict the loan amount that can be sanctioned to customers who have applied for a home loan using the features provided in the dataset.
+
+## 1.2 Project Question
+
+-   What is the relationship between the variables and the credit amount？
+
+-   What is the relationship between the variables and the bad and good loans？
+
+-   Which model performs best on predicting the credit risk level of applicants? (classification)
+
+-   Which model performs best on predicting the loan amount? (regression)
+
+# 2 Data Pre-processing
+
+## 2.1 German Credit Risk dataset
+
+### 2.1.1 Data Understanding
+
+### Import libraries
+
+```{r import libraries, message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(VIM)
+library(missForest)
+library(Hmisc)
+library(caret)
+library(ggplot2)
+library(e1071)
+library(klaR)
+library(nnet)
+library(Metrics)
+library(rpart)
+library(rpart.plot)
+library(tidyverse)
+library(skimr)
+library(caret)
+library(pROC)
+library(DataExplorer)
+library(mice)
+```
+
+### Read data
+
+```{r,message=FALSE}
+df = read.csv('german_credit_data.csv', stringsAsFactors = T) 
+#df = read.csv(file.choose(), stringsAsFactors = T) 
+#Delete the 1st column which is used for indexing.
+df=df[,-1]
+head(df)
+
+```
+
+### See the structure of dataset
+
+```{r str}
+str(df)
+
+```
+
+## 2.1.2 Handle missing data
+
+### Check missing values
+
+```{r check NAs}
+print(paste('Complete obs.:',sum(complete.cases(df))))
+
+```
+
+-   Distribution of NAs (by column):
+
+```{r}
+colSums(is.na(df))
+
+```
+
+-   Check if any missing value is "" type
+
+```{r}
+colSums(df=="")
+
+```
+
+### Visualisation of missing part
+
+```{r VIM}
+aggr(df,labels=names(df),col=c('blue','red'),
+     numbrs=T,sortVars=T)
+
+```
+
+As shown above, Saving.accounts & Check.account contain missing values, and red color presents missing part.
+
+### Impute NAs
+
+**missForest** is used to impute missing values particularly in the case of mixed-type data. It can be used to impute **continuous and/or categorical** data including complex interactions and nonlinear relations. It yields an out-of-bag (OOB) imputation error estimate. Moreover, it can be run parallel to save computation time.
+
+```{r missForest}
+df.mis <- df[!complete.cases(df),]
+df.train <- df[complete.cases(df),]
+set.seed(42)
+df.imp <- missForest(xmis = df.mis, xtrue = df.train, maxiter = 10, ntree = 200)
+message('Out of Bag error: ', df.imp$OOBerror)
+```
+
+**Save imputation result**
+
+```{r impute}
+df.nomis <- df
+df.nomis[!complete.cases(df.nomis),] <- df.imp$ximp
+
+```
+
+**Saving.account values distribution after imputation:**
+
+```{r}
+table(df.nomis$Saving.accounts)
+
+```
+
+**Checking.account values distribution after imputation:**
+
+```{r}
+table(df.nomis$Checking.account)
+
+```
+
+-   Save cleaned dataset
+
+```{r save dataset}
+write.csv(df.nomis,file = 'german_credit_data_rmna.csv',row.names=F)
+
+```
+
+-   Summary dataset
+
+```{r summary}
+summary(df.nomis)
+
+```
+
+### Descriptions of cleaned dataset
+
+-   Age: (quantitative, in years)
+-   Sex: (dichotomous: female, male)
+-   Job: (ordinal: 0 - unskilled and non-resident, 1 - unskilled and resident, 2 - skilled, 3 - highly skilled)
+-   Housing: (nominal: own, rent, or free)
+-   Saving.accounts: (ordinal: little, moderate, quite rich, rich) - Status of existing saving account.
+-   Checking.account: (ordinal: little, moderate, rich) - Status of existing checking account.
+-   Credit.amount: (quantitative, in D-mark) The maximum amount that the bank is committed to lend.
+-   Duration: (quantitative, in month) The specified time to pay the credit.
+-   Purpose: (nominal: car, furniture/equipment, radio/TV, domestic appliances, repairs, education, business, vacation/others) - Reasons to get a loan.
+-   Risk: (dichotomous : good, bad)
+
+## 2.2 Sanction Loan dataset
+
+### 2.2.1 Data Understanding
+
+### Read data
+
+```{r,message=FALSE}
+data = read.csv('train.csv', stringsAsFactors = T) 
+#data = read.csv(file.choose(), stringsAsFactors = T) 
+#select needed vars for regression model.
+data=subset(data, select=c(Age, Income..USD., Loan.Amount.Request..USD.,
+                           Current.Loan.Expenses..USD., Credit.Score,
+                           Property.Price, Loan.Sanction.Amount..USD., Type.of.Employment))
+#rename vars
+names(data) <- c('Age','Income','Loan.Amount.Request','Current.Loan.Expenses','Credit.Score','Property.Price','Loan.Sanction.Amount','Employment.Type')
+head(data)
+```
+
+### See the structure of dataset
+
+```{r}
+str(data)
+```
+
+## 2.2.2 Handle missing data
+
+### Check missing values
+
+```{r}
+print(paste('Complete obs.:',sum(complete.cases(data))))
+```
+
+-   Distribution of NAs (by column):
+
+```{r}
+colSums(is.na(data))
+```
+
+-   Check if any missing value is "" type
+
+```{r}
+colSums(data=="")
+```
+
+### Visualisation of missing part
+
+```{r}
+aggr(data,labels=names(data),col=c('blue','red'),
+     numbrs=T,sortVars=T)
+
+```
+
+As shown above, 4 columns contain missing values, and red color presents missing part.
+
+### impute NAs and solve outliers
+
+```{r Income}
+# use group median income of employment type to impute income
+new <- ave(data$Income, list(data$Employment.Type), FUN=function(x) median(x, na.rm = TRUE))
+# smooth anomaly obs
+ggplot(data)+
+  geom_boxplot(aes(x=Income))
+data$Income[is.na(data$Income)] <- new[is.na(data$Income)]
+data[data['Income']>120000,'Income']<- median(data[data$Employment.Type==data[data['Income']>120000,'Employment.Type'],'Income'])
+
+```
+
+```{r Current.Loan.Expenses}
+data$Current.Loan.Expenses[is.na(data$Current.Loan.Expenses)] <- median(data$Current.Loan.Expenses, na.rm=TRUE)
+ggplot(data)+
+  geom_boxplot(aes(x=Current.Loan.Expenses))
+data[data$Current.Loan.Expenses<0,]$Current.Loan.Expenses <- median(data$Current.Loan.Expenses, na.rm=TRUE)
+```
+
+```{r Credit.Score}
+data$Credit.Score[is.na(data$Credit.Score)] <- mean(data$Credit.Score, na.rm=TRUE)
+ggplot(data)+
+  geom_boxplot(aes(x=Credit.Score))
+```
+
+```{r Loan.Sanction.Amount}
+data$Loan.Sanction.Amount[is.na(data$Loan.Sanction.Amount)] <- 
+median(data$Loan.Sanction.Amount, na.rm=TRUE)
+ggplot(data)+
+  geom_boxplot(aes(x=Loan.Sanction.Amount))
+```
+
+```{r}
+data=subset(data,select = -c(Employment.Type))
+```
+
+-   Save cleaned dataset
+
+```{r save dataset2}
+write.csv(data,file = 'train_cleaned.csv',row.names=F)
+
+```
+
+-   Summary dataset
+
+```{r}
+summary(data)
+
+```
+
+# 3 Exploratory Data Analysis
+
+## 3.1 show the relationship between the duration of credit and the credit amount
+
+```{r}
+Dur_Cred_Plot<-ggplot(df.nomis, aes(x=Duration, y=Credit.amount))+geom_point()
+Dur_Cred_Plot
+
+```
+
+## 3.2 show the relationship between the sex and the credit amount
+
+```{r}
+Sex_Cred_Plot<-ggplot(df.nomis,aes(x=Sex, y=Credit.amount))+geom_jitter(size=2, alpha=0.5)
+Sex_Cred_Plot
+
+```
+
+## 3.3 analyse the relationship between duration of credit and age
+
+```{r}
+Dur_Age_Plot<-ggplot(df.nomis,aes(x=Duration, y=Age, color=Risk))+geom_point()+geom_smooth()
+Dur_Age_Plot
+
+```
+
+## 3.4 display points in scatter plot for bad and good loans
+
+```{r}
+Dur_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Duration,y=Credit.amount))+geom_point(aes(color=Risk))
+Dur_Cred_Risk_Plot
+
+```
+
+## 3.5 use faceting to split entire graph into 2 separate panels for each, good and bads loans
+
+```{r}
+Dur_Cred_Risk_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth(se=F)+
+  facet_grid(.~Risk)
+Dur_Cred_Risk_facetPlot
+
+```
+
+## 3.6 check how the Job variable impacts the credit
+
+```{r}
+Dur_Cred_Risk_Job_Plot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Job))+geom_point()+geom_smooth(se=F, method="lm")+
+  facet_grid(.~Risk)
+Dur_Cred_Risk_Job_Plot
+
+```
+
+## 3.7 facet to split the graph into the 4 type job variables
+
+```{r}
+Dur_Cred_Risk_Job_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Risk))+geom_point()+geom_smooth(se=F, method="lm")+
+  facet_grid(.~Job)
+Dur_Cred_Risk_Job_facetPlot
+
+```
+
+## 3.8 show relationship between the savings account and credit amount
+
+```{r}
+Sav_Cred_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount))+geom_bar(stat="identity")
+Sav_Cred_Plot
+
+```
+
+## 3.9 show the good and bad loans in each savings account category
+
+```{r}
+Sav_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount, fill=Risk))+geom_bar(stat="identity", position=position_dodge())
+Sav_Cred_Risk_Plot
+
+```
+
+## 3.10 analyse the good and bad loans in the relationship between duration of credit and credit amount using the housing variable
+
+```{r}
+Dur_Cred_House_Risk<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth()+
+  facet_grid(Housing~Risk)
+Dur_Cred_House_Risk
+
+```
+
+# 4 Modeling
+
+## 4.1 Regression Model predict loan sanction amount (regression)
+
+```{r}
+skim(data)
+```
+
+```{r}
+# Check the missing data
+plot_missing(data)
+```
+
+```{r}
+class(data)
+```
+
+```{r}
+head(data)
+```
+
+```{r}
+# feature engineering
+# Train/Test split for Regression
+set.seed(42)
+train1 <-createDataPartition(y=data$Loan.Sanction.Amount,p=0.7,list=FALSE)
+
+train <- data[train1, ]
+
+test <- data[-train1, ]
+
+```
+
+```{r}
+hist(data$Loan.Sanction.Amount,breaks=50)
+```
+
+```{r}
+# Split dependent variable distribution
+hist(train$Loan.Sanction.Amount,breaks=50)
+hist(test$Loan.Sanction.Amount,breaks=50)
+
+```
+
+```{r}
+# fold cross validation
+train_control <- trainControl(method="cv", number=10)
+```
+
+### 4.1.1 simple linear regression model (r2 = 0.5201)
+
+```{r}
+# the correlation between all vars
+cor(data)
+# the correlation between target and each feature
+data_cor <- cor(data[ , colnames(data) != "Loan.Sanction.Amount"],
+                data$Loan.Sanction.Amount)
+data_cor
+
+fit <- lm(Loan.Sanction.Amount ~ Loan.Amount.Request,data = data)
+summary(fit)
+```
+
+```{r}
+plot(data$Loan.Amount.Request,data$Loan.Sanction.Amount)
+abline(fit) 
+```
+
+### 4.1.2 multiple linear regression model (r2 = 0.5764)
+
+```{r}
+fit2 <- lm(Loan.Sanction.Amount ~ Age+Income+Loan.Amount.Request+Current.Loan.Expenses+Credit.Score+Property.Price,data = data)
+summary(fit2)
+```
+
+```{r}
+anova(fit,fit2)
+```
+
+```{r}
+# ridge regression (r2 = 0.5839)
+set.seed(42)
+model_ridge <- train(Loan.Sanction.Amount ~ Age+Income+Loan.Amount.Request+Current.Loan.Expenses+Credit.Score+Property.Price, data= train, trControl=train_control,method="ridge", metric="RMSE")
+model_ridge
+```
+
+```{r}
+# Least Angle Regression (r2 = 0.5839)
+set.seed(42)
+model_lars <- train(Loan.Sanction.Amount ~ Age+Income+Loan.Amount.Request+Current.Loan.Expenses+Credit.Score+Property.Price, data= train, trControl=train_control,method="lars", metric="RMSE")
+model_lars
+```
+
+```{r}
+# lasso regression (r2 = 0.5763)
+x <- data.matrix(subset(data,select = -c(Loan.Sanction.Amount)))
+y <- data$Loan.Sanction.Amount
+library(glmnet)
+
+#perform k-fold cross-validation to find optimal lambda value
+cv_model <- cv.glmnet(x, y, alpha = 1)
+
+#find optimal lambda value that minimizes test MSE
+best_lambda <- cv_model$lambda.min
+best_lambda
+plot(cv_model)
+best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+coef(best_model)
+#use fitted best model to make predictions
+y_predicted <- predict(best_model, s = best_lambda, newx = x)
+
+#find SST and SSE
+sst <- sum((y - mean(y))^2)
+sse <- sum((y_predicted - y)^2)
+
+#find R-Squared
+rsq <- 1 - sse/sst
+rsq
+```
+
+Evidently, ridge regression has the smaller RMSE and we will choose it as our prediction model. Similarly, we will confirm whether our model is overfitting.
+
+```{r}
+# Make predictions on the testing dataset
+x_test_reg <- data[,1:6 ]
+y_test_reg <- data[, 7]
+prediction_ridge <- predict(model_ridge,x_test_reg)
+RMSE(prediction_ridge, y_test_reg)
+```
+
+```{r}
+# decision tree
+colnames(data)
+form_reg <- as.formula(
+  paste0('Loan.Sanction.Amount~',
+         paste(colnames(train)[1:6],collapse="+")
+    
+  )
+)
+form_reg
+```
+
+```{r}
+# training model
+set.seed(42)
+fit_dt_reg <- rpart(
+  form_reg,#formula
+  data = train,
+  method = "anova",# regression
+  control = rpart.control(cp = 0.005)
+)
+```
+
+```{r}
+# Original regression tree
+fit_dt_reg
+```
+
+```{r}
+# Complexity correlation
+printcp(fit_dt_reg)
+plotcp(fit_dt_reg)
+
+```
+
+```{r}
+# After the cut branches
+fit_dt_reg_pruned <- prune(fit_dt_reg,cp =0.024)
+print(fit_dt_reg_pruned)
+```
+
+```{r}
+# Variable importance value
+fit_dt_reg_pruned$variable.importance
+fit_dt_reg$variable.importance
+
+```
+
+```{r}
+# Variable importance diagram
+varimpdata <- 
+  data.frame(importance=fit_dt_reg_pruned$variable.importance)
+ggplot(varimpdata,
+       aes(x = as_factor(rownames(varimpdata)),y=importance))+
+  geom_col()+
+  labs(x = 'variables')+
+  theme_classic()
+```
+
+```{r}
+# tree diagram
+prp(fit_dt_reg_pruned,
+    type=1,
+    extra = 101,
+    fallen.leaves =TRUE,
+    main="Decision Tree")
+
+```
+
+```{r}
+# predicted
+# The training set predicts the results
+trainpred <- predict(fit_dt_reg_pruned,newdata=train)
+```
+
+```{r}
+# Training set prediction error index
+defaultSummary(data.frame(obs = train$Loan.Sanction.Amount,pred=trainpred))
+```
+
+```{r}
+# Graph the training set predicted results
+plot(x=train$Loan.Sanction.Amount,
+     y=trainpred,
+     xlab="Actual",
+     ylab="Prediction",
+     main='Comparison of actual and predicted values',
+     sub= 'training set')
+trainlinmod <- lm(trainpred~train$Loan.Sanction.Amount)
+abline(trainlinmod,col="blue",lwd = 2.5,lty='solid')
+abline(a=0,b=1,col='red',lwd=2.5,lty='dashed')
+legend("topleft",
+       legend = c("Model","Base"),
+       col  = c("blue","red"),
+       lwd = 2.5,
+       lty = c("solid","dashed"))
+```
+
+```{r}
+# Test sets predict results
+testpred <- predict(fit_dt_reg_pruned,newdata = test)
+```
+
+```{r}
+# Test set prediction error index
+defaultSummary(data.frame(obs= test$Loan.Amount.Request,pred=testpred))
+```
+
+```{r}
+# Graph the test set predicted results
+plot(x=test$Loan.Sanction.Amount,
+     y=testpred,
+     xlab="Actual",
+     ylab="Prediction",
+     main='Comparison of actual and predicted values',
+     sub= 'test set')
+testlinmod <- lm(testpred~test$Loan.Amount.Request)
+abline(testlinmod,col="blue",lwd = 2.5,lty='solid')
+abline(a=0,b=1,col='red',lwd=2.5,lty='dashed')
+legend("topleft",
+       legend = c("Model","Base"),
+       col  = c("blue","red"),
+       lwd = 2.5,
+       lty = c("solid","dashed"))
+```
+
+Conclusion: Loan.Amount.Request and Property.Price have a great influence on the target value. We could see both R2 score are about 0.58 and perform almost the same with the model trained on all features. Thus we could predict the Loan.Sanction.Amount with ridge regression model especially considering a vast amount of data.
