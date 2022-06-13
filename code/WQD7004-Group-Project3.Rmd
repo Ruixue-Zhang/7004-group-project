@@ -112,6 +112,13 @@ library(caret)
 library(pROC)
 library(DataExplorer)
 library(mice)
+library(tables)
+library(Amelia)
+library(car)
+library(corrplot)
+library(nnet)
+library(caTools)
+library(ROCR)
 ```
 
 ### Read data
@@ -333,89 +340,234 @@ summary(data)
 
 # 3 Exploratory Data Analysis
 
-## 3.1 show the relationship between the duration of credit and the credit amount
-
+## 3.1 General Correlation
 ```{r}
-Dur_Cred_Plot<-ggplot(df.nomis, aes(x=Duration, y=Credit.amount))+geom_point()
-Dur_Cred_Plot
+df.nomis_temp <- df.nomis
+df.nomis_temp$Age <- as.numeric(df.nomis_temp$Age)
+df.nomis_temp$Sex <- as.numeric(df.nomis_temp$Sex)
+df.nomis_temp$Job <- as.numeric(df.nomis_temp$Job)
+df.nomis_temp$Housing <- as.numeric(df.nomis_temp$Housing)
+df.nomis_temp$Saving.accounts <- as.numeric(df.nomis_temp$Saving.accounts)
+df.nomis_temp$Checking.account <- as.numeric(df.nomis_temp$Checking.account)
+df.nomis_temp$Credit.amount <- as.numeric(df.nomis_temp$Credit.amount)
+df.nomis_temp$Duration <- as.numeric(df.nomis_temp$Duration)
+df.nomis_temp$Purpose <- as.numeric(df.nomis_temp$Purpose)
+df.nomis_temp$Risk <- as.numeric(df.nomis_temp$Risk)
+
+corrplot(cor(df.nomis_temp),tl.cex = 0.6, method = "color",  addCoef.col="black", number.cex = 0.5)
 
 ```
 
-## 3.2 show the relationship between the sex and the credit amount
+## 3.2 Variables Distribution
 
+### 3.2.1 Continuous Variables Distribution
 ```{r}
-Sex_Cred_Plot<-ggplot(df.nomis,aes(x=Sex, y=Credit.amount))+geom_jitter(size=2, alpha=0.5)
-Sex_Cred_Plot
+summary(df.nomis[,c(1,7,8)])
+par(mfrow = c(2,2))
 
 ```
 
-## 3.3 analyse the relationship between duration of credit and age
-
+#### Age, Credit.amount, Duration
 ```{r}
-Dur_Age_Plot<-ggplot(df.nomis,aes(x=Duration, y=Age, color=Risk))+geom_point()+geom_smooth()
-Dur_Age_Plot
+hist(df.nomis$Age, main = "Age", prob = TRUE)
+lines(density(df.nomis$Age),col="red")
+lines(density(df.nomis$Age, adjust=2), lty="dotted")
+
+hist(df.nomis$Credit.amount, main = "Credit.amount", prob = TRUE)
+lines(density(df.nomis$Credit.amount),col="red")
+lines(density(df.nomis$Credit.amount, adjust=2), lty="dotted") 
+
+hist(df.nomis$Duration, main = "Duration", prob = TRUE)
+lines(density(df.nomis$Duration),col="red")
+lines(density(df.nomis$Duration, adjust=3), lty="dotted")
 
 ```
 
-## 3.4 display points in scatter plot for bad and good loans
-
+### 3.2.2 Discrete Variables Distribution
 ```{r}
-Dur_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Duration,y=Credit.amount))+geom_point(aes(color=Risk))
-Dur_Cred_Risk_Plot
+tabular(Sex~1*(n=1 + Percent("col")),data = df.nomis)
+tabular(Housing~1*(n=1 + Percent("col")),data = df.nomis)
+tabular(Purpose~1*(n=1 + Percent("col")),data = df.nomis)
+tabular(Risk~1*(n=1 + Percent("col")),data = df.nomis)
+
+```
+```{r}
+ggplot(data = df.nomis, aes(Job), main = "Job") + geom_bar(fill="pink") + 
+geom_text(aes(label=..count..),stat="count", vjust= 0.1, cex =5)  
+
+ggplot(data = df.nomis, aes(Saving.accounts), main = "Saving.accounts") + geom_bar(fill="pink") + 
+geom_text(aes(label=..count..),stat="count", vjust= 0.1, cex =5)  
+
+ggplot(data = df.nomis, aes(Checking.account), main = "Checking.account") + geom_bar(fill="pink") + geom_text(aes(label=..count..),stat="count", vjust= 0.1, cex =5) 
 
 ```
 
-## 3.5 use faceting to split entire graph into 2 separate panels for each, good and bads loans
+## 3.3 Correlations with Credit Risk
 
+### 3.3.1 Age
+
+#### Age and Risk
 ```{r}
-Dur_Cred_Risk_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth(se=F)+
-  facet_grid(.~Risk)
-Dur_Cred_Risk_facetPlot
+ggplot(df.nomis) + geom_density(aes(Age,fill= Risk),alpha= 0.3)
 
 ```
 
-## 3.6 check how the Job variable impacts the credit
-
+#### Age, Risk and Sex
 ```{r}
-Dur_Cred_Risk_Job_Plot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Job))+geom_point()+geom_smooth(se=F, method="lm")+
-  facet_grid(.~Risk)
-Dur_Cred_Risk_Job_Plot
+df.nomis %>% ggplot(aes(Sex,Age, fill=Risk)) + geom_boxplot() + scale_y_continuous(breaks = seq(0,100,10))+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
 
 ```
 
-## 3.7 facet to split the graph into the 4 type job variables
-
+#### Age, Risk and Housing
 ```{r}
-Dur_Cred_Risk_Job_facetPlot<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount, color=Risk))+geom_point()+geom_smooth(se=F, method="lm")+
-  facet_grid(.~Job)
-Dur_Cred_Risk_Job_facetPlot
+df.nomis %>% ggplot(aes(Housing,Age, fill=Risk)) + geom_boxplot() + scale_y_continuous(breaks = seq(0,100,10))+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
 
 ```
 
-## 3.8 show relationship between the savings account and credit amount
+### 3.3.2 Sex
 
+#### Sex and Risk
 ```{r}
-Sav_Cred_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount))+geom_bar(stat="identity")
-Sav_Cred_Plot
+tabular(Risk*Sex~1*(n=1 + Percent("col")), data=df.nomis)
+
+```
+```{r}
+df.nomis %>% ggplot(aes(Sex,fill=Risk)) +geom_bar() + geom_text(stat="count", aes(label=..count..,group=Risk), 
+position = "stack",vjust=1, cex = 4)+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
 
 ```
 
-## 3.9 show the good and bad loans in each savings account category
-
+#### Sex, Risk and Housing 
 ```{r}
-Sav_Cred_Risk_Plot<-ggplot(df.nomis,aes(x=Saving.accounts, y=Credit.amount, fill=Risk))+geom_bar(stat="identity", position=position_dodge())
-Sav_Cred_Risk_Plot
+ggplot(aes(x= Sex,fill=Risk),data = df.nomis) +geom_bar() + 
+geom_text(stat="count", aes(label=..count..,group=Risk), position = "stack",vjust=1, cex =4) + facet_wrap(~Housing)+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
 
 ```
 
-## 3.10 analyse the good and bad loans in the relationship between duration of credit and credit amount using the housing variable
+### 3.3.3 Job
 
+#### Job and Risk
 ```{r}
-Dur_Cred_House_Risk<-ggplot(df.nomis,aes(x=Duration, y=Credit.amount))+geom_point()+geom_smooth()+
-  facet_grid(Housing~Risk)
-Dur_Cred_House_Risk
+df.nomis %>% ggplot(aes(x=Job, fill = Risk)) + geom_bar() + geom_text(stat= "count", aes(label=..count.., group = Risk),cex=3.5, vjust=1, position = "stack")+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
 
 ```
+            
+#### Job, Housing and Risk
+```{r}
+df.nomis %>% ggplot(aes(Job, fill= Risk)) + geom_bar(alpha= 0.3) + facet_wrap(~Housing) 
+
+```
+
+#### Job, Credit.amount and Risk
+```{r}
+df.nomis %>%  ggplot(aes(Job,Credit.amount, fill=Risk)) + geom_boxplot() + facet_wrap(~Job)+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+#### Job, Duration and Risk
+```{r}
+df.nomis %>%  ggplot(aes(Job,Duration, fill=Risk)) + geom_boxplot() + facet_wrap(~Job)+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+### 3.3.4 Housing
+
+#### Housing and Risk
+```{r}
+tabular(Risk*Housing~1*(n=1 + Percent("col")), data=df.nomis)
+
+```
+```{r}
+df.nomis %>% ggplot(aes(x= Housing, fill = Risk)) + geom_bar() + geom_text(stat= "count", aes(label=..count.., group = Risk),cex=3.5, vjust=1, position = "stack")+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+#### Housing, Duration and Risk
+```{r}
+df.nomis %>% ggplot(aes(Housing, Duration, fill=Risk)) + geom_boxplot() + scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+#### Housing, Credit.amount and risk
+```{r}
+df.nomis %>% ggplot(aes(Housing, Credit.amount, fill=Risk)) + geom_boxplot()+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+### 3.3.5 Savings.accounts
+
+#### Saving.accounts and Risk
+```{r}
+df.nomis %>% ggplot(aes(x=Saving.accounts, fill = Risk)) + geom_bar() + geom_text(stat= "count", aes(label=..count.., group = Risk),cex=3.5, vjust=1, position = "stack")+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+#### Saving.accounts, Credit.amount and Risk
+```{r}
+df.nomis %>%  ggplot(aes(Saving.accounts,Credit.amount, fill=Risk)) + geom_boxplot() + facet_wrap(~Saving.accounts)+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+### 3.3.6 Checking.account
+
+#### Checking.account and Risk
+```{r}
+df.nomis %>% ggplot(aes(x=Checking.account, fill = Risk)) + geom_bar() + geom_text(stat= "count", aes(label=..count.., group = Risk),cex=3.5, vjust=1, position = "stack")+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+### 3.3.7 Credit.amount
+
+#### Credit.amount and Risk
+```{r}
+ggplot(df.nomis) + geom_density(aes(Credit.amount,fill= Risk),alpha= 0.3) 
+
+```
+
+#### Credit.amount and Duration
+```{r}
+df.nomis %>% ggplot(aes(Duration, Credit.amount)) + geom_point()
+
+```
+
+#### Credit.amount and Purpose
+```{r}
+df.nomis %>% ggplot(aes(Purpose, Credit.amount,fill=Risk)) + geom_boxplot() +facet_wrap(~Risk)+ theme(axis.text.x  = element_text(angle = 45, hjust = 1))+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+### 3.3.8 Duration
+```{r}
+ggplot(df.nomis) + geom_boxplot(aes(Risk,Duration, fill = Risk))+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
+### 3.3.9 Purpose
+```{r}
+tabular(Risk*Purpose~1*(n=1 + Percent("col")), data=df.nomis)
+
+```
+```{r}
+df.nomis %>% ggplot(aes(x= Purpose, fill = Risk)) + geom_bar() + geom_text(stat= "count", aes(label=..count.., group = Risk),cex=3.5, vjust=1, position = "stack") + theme(axis.text.x  = element_text(angle = 45, hjust = 1))+ scale_fill_manual(breaks = df.nomis$Risk,
+values = c("yellow", "red"))
+
+```
+
 
 # 4 Modeling
 
