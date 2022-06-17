@@ -119,6 +119,9 @@ library(corrplot)
 library(nnet)
 library(caTools)
 library(ROCR)
+library(tree)
+library(randomForest)
+library(class)
 ```
 
 ### Read data
@@ -826,3 +829,57 @@ legend("topleft",
 ```
 
 Conclusion: Loan.Amount.Request and Property.Price have a great influence on the target value. We could see both R2 score are about 0.58 and perform almost the same with the model trained on all features. Thus we could predict the Loan.Sanction.Amount with ridge regression model especially considering a vast amount of data.
+
+## 4.2 Classification Model
+
+```{r}
+# read data
+df = read.csv("german_credit_data_rmna.csv", stringsAsFactors = T)
+```
+
+### 4.2.1 Naive Bayes (0.7133)
+
+```{r}
+# split into train set and test set
+set.seed(42)
+index <- sample(2, nrow(df), replace = T, prob = c(0.7, 0.3))
+train <- df[index == 1,]
+test <- df[index == 2,]
+```
+
+```{r}
+nb <- naiveBayes(Risk~., data=train, laplace=1)
+nb_pred <- predict(nb, test, type = 'class')
+table(nb_pred, test$Risk)
+confusionMatrix(nb_pred, test$Risk)
+```
+
+### 4.2.2 Random Forest (0.7235)
+
+```{r}
+
+rf <- randomForest(Risk ~., 
+                                data = train, #train data set 
+                                importance = T) 
+rf
+rf.pred <- predict(rf, test[,-10])
+table(observed = test[,10], predicted = rf.pred)
+confusionMatrix(rf.pred, test$Risk)
+```
+
+### 4.2.3 KNN (0.6519)
+
+```{r}
+Xtrain <- train[-10]
+Xtrain <- as.data.frame(lapply(Xtrain, as.integer))
+Xtest <- test[-10]
+Xtest <- as.data.frame(lapply(Xtest, as.integer))
+train.label <- as.integer(train$Risk)
+test.label <- as.integer(test$Risk)
+knn.pred <- knn(train = Xtrain, test = Xtest, cl= train.label,k = 3,prob=TRUE, use.all = T)
+confusionMatrix(knn.pred, factor(test.label))
+```
+
+### 4.2.4 Conclusion
+
+We got different accuracy scores in the 3 models (Naive Bayes, Random Forest, and KNN). And Random Forest has a best performance which accuracy score is 72.35%.
